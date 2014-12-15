@@ -135,3 +135,6 @@ chat.zss.guard.trade.1.2=Ahahaha! Shabby sword, lad! Here take this new and shin
 chat.zss.guard.trade.2.2=Ahahaha! Seems like you're not worthy to wield a soldiers sword!
 chat.zss.guard.trade.1.1=Nice sword, bud! But hey, take this instead!
 chat.zss.guard.trade.2.1=Ohh, you want the basic sword? Take it.
+entity.zeldaswordskills.landOctorok.name.0=Red Land Octorok
+entity.zeldaswordskills.landOctorok.name.1=Blue Land Octorok
+entity.zssaddon.landOctorok.name=Land Octorok

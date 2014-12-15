@@ -81,9 +81,9 @@ public class ModelLandOctorok extends ModelBase
     public void setRotationAngles(float f, float f1, float f2, float f3, float f4, float f5, Entity entity)
     {
     	super.setRotationAngles(f, f1, f2, f3, f4, f5, entity);
-    	foot1.rotateAngleX = MathHelper.cos(f1 * 0.6662F) * 1.4F * f2;
-    	foot2.rotateAngleX = MathHelper.cos(f1 * 0.6662F + 3.1415927F) * 1.4F * f2;
-    	foot3.rotateAngleX = MathHelper.cos(f1 * 0.6662F) * 1.4F * f2;
-    	foot4.rotateAngleX = MathHelper.cos(f1 * 0.6662F + 3.1415927F) * 1.4F * f2;
+    	foot1.rotateAngleX = MathHelper.cos(f * 0.6662F) * 1.4F * f1;
+    	foot2.rotateAngleX = MathHelper.cos(f * 0.6662F + 3.1415927F) * 1.4F * f1;
+    	foot3.rotateAngleX = MathHelper.cos(f * 0.6662F) * 1.4F * f1;
+    	foot4.rotateAngleX = MathHelper.cos(f * 0.6662F + 3.1415927F) * 1.4F * f1;
     }
 }

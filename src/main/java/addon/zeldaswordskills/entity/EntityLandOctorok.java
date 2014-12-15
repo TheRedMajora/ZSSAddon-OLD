@@ -3,18 +3,27 @@
 
 package addon.zeldaswordskills.entity;
 
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.EnumCreatureAttribute;
+import net.minecraft.entity.IRangedAttackMob;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.EntityAIArrowAttack;
+import net.minecraft.entity.ai.EntityAIBeg;
+import net.minecraft.entity.ai.EntityAIFleeSun;
+import net.minecraft.entity.ai.EntityAIHurtByTarget;
+import net.minecraft.entity.ai.EntityAILookIdle;
+import net.minecraft.entity.ai.EntityAINearestAttackableTarget;
+import net.minecraft.entity.ai.EntityAIRestrictSun;
+import net.minecraft.entity.ai.EntityAISwimming;
+import net.minecraft.entity.ai.EntityAIWander;
+import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.monster.IMob;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.DamageSource;
 import net.minecraft.world.EnumDifficulty;
 import net.minecraft.world.World;
 import zeldaswordskills.api.block.IWhipBlock.WhipType;
@@ -26,16 +35,33 @@ import zeldaswordskills.entity.projectile.EntityThrowingRock;
 import zeldaswordskills.item.ZSSItems;
 import zeldaswordskills.ref.Config;
 
-public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLootable, IEntityVariant
+public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLootable, IEntityVariant, IRangedAttackMob
 {
+	private EntityAIArrowAttack aiBulletAttack = new EntityAIArrowAttack(this, 1.0D, 20, 60, 15.0F);
 	private static final int LANDOCTOROK_TYPE_INDEX = 13;
 
 	public EntityLandOctorok(World world)
 	{
 		super(world);
-		experienceValue = 5;
-	}
+        this.tasks.addTask(1, new EntityAISwimming(this));
+        this.tasks.addTask(5, new EntityAIWander(this, 1.0D));
+        this.tasks.addTask(6, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
+        this.tasks.addTask(6, new EntityAILookIdle(this));
+        this.targetTasks.addTask(1, new EntityAIHurtByTarget(this, false));
+        this.targetTasks.addTask(2, new EntityAINearestAttackableTarget(this, EntityPlayer.class, 0, true));
 
+        if (world != null && !world.isRemote)
+        {
+            this.setCombatTask();
+        }
+	}
+	
+	@Override
+	protected boolean isAIEnabled()
+	{
+		return true;
+	}
+	
 	@Override
 	public void entityInit()
 	{
@@ -61,12 +87,6 @@ public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLo
 	}
 
 	@Override
-	public boolean canAttackClass(Class par1Class)
-	{
-		return super.canAttackClass(par1Class) && par1Class != EntityLandOctorok.class;
-	}
-
-	@Override
 	public void onUpdate()
 	{
 		super.onUpdate();
@@ -76,44 +96,16 @@ public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLo
 			//R.I.P ;(
 		}
 	}
-
-	@Override
-	protected void updateEntityActionState()
-	{
-		float distance = 0.0F;
-		++entityAge;
-
-		if (entityToAttack == null)
-		{
-			entityToAttack = findPlayerToAttack();
-		}
-		else if (entityToAttack.isEntityAlive() && canAttackClass(entityToAttack.getClass()))
-		{
-			distance = entityToAttack.getDistanceToEntity(this);
-			
-			if (distance > 16.0F)
-			{
-				entityToAttack = null;
-			}
-			else if (canEntityBeSeen(entityToAttack))
-			{
-				attackEntity(entityToAttack, distance);
-			}
-		}
-		else
-		{
-			entityToAttack = null;
-		}
-
-		despawnEntity();
-	}
+	
+	
 
 	@Override
 	protected void applyEntityAttributes()
 	{
 		super.applyEntityAttributes();
+		
+		getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(0.25D);
 		getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(12.0D);
-		getEntityAttribute(SharedMonsterAttributes.knockbackResistance).setBaseValue(0.75D);
 		getAttributeMap().registerAttribute(SharedMonsterAttributes.attackDamage).setBaseValue(2.0D);
 	}
 
@@ -124,120 +116,26 @@ public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLo
 	}
 
 	@Override
-	public boolean getCanSpawnHere()
+	public void attackEntityWithRangedAttack(EntityLivingBase entity, float distance)
 	{
-		return posY > 45.0D && posY < 63.0D && worldObj.difficultySetting != EnumDifficulty.PEACEFUL && super.getCanSpawnHere();
-	}
-
-	@Override
-	public int getTotalArmorValue()
-	{
-		return Math.min(super.getTotalArmorValue() + 2, 20);
-	}
-
-	@Override
-	protected Entity findPlayerToAttack()
-	{
-		EntityPlayer entityplayer = worldObj.getClosestVulnerablePlayerToEntity(this, 16.0D);
-		return entityplayer != null && canEntityBeSeen(entityplayer) ? entityplayer : null;
-	}
-
-	@Override
-	public boolean attackEntityFrom(DamageSource source, float amount)
-	{
-		if (isEntityInvulnerable() || source.isExplosion())
+		if(entity instanceof EntityPlayer)
 		{
-			return false;
-		}
-		else if (super.attackEntityFrom(source, amount))
-		{
-			Entity entity = source.getEntity();
-			
-			if (riddenByEntity != entity && ridingEntity != entity)
+			float f = (float) getEntityAttribute(SharedMonsterAttributes.attackDamage).getAttributeValue();
+			Entity projectile;
+			int difficulty = worldObj.difficultySetting.getDifficultyId();
+		
+			if (getType() == 1)
 			{
-				if (entity != this)
-				{
-					entityToAttack = entity;
-				}
-				
-				return true;
+				projectile = new EntityBomb(worldObj, this, (EntityLivingBase) entity, 1.0F, (float)(14 - difficulty * 4)).setType(BombType.BOMB_STANDARD).setTime(12 - (difficulty * 2)).setNoGrief().setMotionFactor(0.25F).setDamage(f * 2.0F * difficulty);
 			}
 			else
 			{
-				return true;
-			}
-		}
-		else
-		{
-			return false;
-		}
-	}
-
-	@Override
-	public boolean attackEntityAsMob(Entity entity)
-	{
-		float f = (float) getEntityAttribute(SharedMonsterAttributes.attackDamage).getAttributeValue();
-		int i = 0;
-
-		if (entity instanceof EntityLivingBase)
-		{
-			f += EnchantmentHelper.getEnchantmentModifierLiving(this, (EntityLivingBase)entity);
-			i += EnchantmentHelper.getKnockbackModifier(this, (EntityLivingBase)entity);
-		}
-
-		boolean flag = entity.attackEntityFrom(DamageSource.causeMobDamage(this), f);
-
-		if (flag)
-		{
-			int j = EnchantmentHelper.getFireAspectModifier(this);
-			
-			if (j > 0)
-			{
-				entity.setFire(j * 4);
+				projectile = new EntityThrowingRock(worldObj, this, (EntityLivingBase) entity, 1.0F, (float)(14 - difficulty * 4)).setDamage(f * difficulty);
 			}
 
-			if (entity instanceof EntityLivingBase)
-			{
-				EnchantmentHelper.func_151384_a((EntityLivingBase) entity, this);
-			}
-		}
-
-		return flag;
-	}
-
-	@Override
-	protected void attackEntity(Entity entity, float distance)
-	{
-		if (attackTime <= 0)
-		{
-			if (distance < 2.0F && entity.boundingBox.maxY > boundingBox.minY && entity.boundingBox.minY < boundingBox.maxY)
-			{
-				attackTime = 20;
-				attackEntityAsMob(entity);
-			}
-			else if (rand.nextInt(60) == 0 && entity instanceof EntityLivingBase)
-			{
-				attackTime = 20;
-				float f = (float) getEntityAttribute(SharedMonsterAttributes.attackDamage).getAttributeValue();
-				Entity projectile;
-				int difficulty = worldObj.difficultySetting.getDifficultyId();
-				
-				if (getType() == 1)
-				{
-					projectile = new EntityBomb(worldObj, this, (EntityLivingBase) entity, 1.0F, (float)(14 - difficulty * 4)).
-					setType(BombType.BOMB_STANDARD).setTime(12 - (difficulty * 2)).setNoGrief().setMotionFactor(0.25F).setDamage(f * 2.0F * difficulty);
-				}
-				else
-				{
-					projectile = new EntityThrowingRock(worldObj, this, (EntityLivingBase) entity, 1.0F, (float)(14 - difficulty * 4)).
-					setIgnoreWater().setDamage(f * difficulty);
-				}
-				
-				if (!worldObj.isRemote)
-				{
-					worldObj.spawnEntityInWorld(projectile);
-				}
-			}
+			//Playsound?
+			//this.playSound("zeldaswordskills" + "octoShoot", 1.0F, 1.0F / (this.getRNG().nextFloat() * 0.4F + 0.8F));
+			worldObj.spawnEntityInWorld(projectile);
 		}
 	}
 
@@ -312,6 +210,11 @@ public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLo
 		compound.setByte("landOctorokType", (byte) getType());
 	}
 
+	public void setCombatTask()
+    {
+		this.tasks.addTask(4, this.aiBulletAttack);
+    }
+	
 	@Override
 	public void readEntityFromNBT(NBTTagCompound compound)
 	{
@@ -322,4 +225,5 @@ public class EntityLandOctorok extends EntityCreature implements IMob, IEntityLo
 			setType(compound.getByte("landOctorokType"));
 		}
 	}
+
 }
